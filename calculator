@@ -1,0 +1,59 @@
+from flask import Flask, jsonify, request
+import requests
+import time
+
+app = Flask(__name__)
+
+# Configuration
+WINDOW_SIZE = 10
+THIRD_PARTY_API_URL = "http://example.com/api"  # Replace with the actual third-party server URL
+TIMEOUT = 0.5  # 500 milliseconds
+
+# Store numbers
+numbers = []
+
+# Function to fetch a number from the third-party server
+def fetch_number(number_type):
+    try:
+        response = requests.get(f"{THIRD_PARTY_API_URL}/{number_type}", timeout=TIMEOUT)
+        if response.status_code == 200:
+            return response.json().get("number")
+    except requests.RequestException:
+        pass
+    return None
+
+# Function to check if a number is unique
+def is_unique(number):
+    return number not in numbers
+
+# Function to calculate the average
+def calculate_average():
+    if numbers:
+        return sum(numbers) / len(numbers)
+    return 0
+
+# Route to handle requests
+@app.route("/numbers/<number_type>", methods=["GET"])
+def get_number(number_type):
+    if number_type not in ['p', 'f', 'e', 'r']:
+        return jsonify({"error": "Invalid number type"}), 400
+
+    previous_numbers = numbers.copy()
+    
+    number = fetch_number(number_type)
+    if number is not None and is_unique(number):
+        if len(numbers) >= WINDOW_SIZE:
+            numbers.pop(0)
+        numbers.append(number)
+
+    current_numbers = numbers.copy()
+    average = calculate_average() if len(numbers) >= WINDOW_SIZE else sum(numbers) / len(numbers)
+
+    return jsonify({
+        "previous_numbers": previous_numbers,
+        "current_numbers": current_numbers,
+        "average": average
+    })
+
+if __name__ == "__main__":
+    app.run(debug=True)
